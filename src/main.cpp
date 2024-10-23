@@ -27,19 +27,34 @@ float temperature = 0.0, humidity = 0.0;
 CRGB leds[NUM_LEDS];
 
 // IR setup &&&& PIN
-//const uint16_t kRecvPin = 36;
+
+const uint16_t kRecvPin = 
+#ifdef ARDUINO_ESP32C3_DEV
+  10; // 14 on a ESP32-C3 causes a boot loop.
+#else
+  16;
+#endif
+
 const uint16_t kIrLedPin = 27; // GPIO for IR LED
 const int LED_PIN = 2; // LED status indicator
 const int RESET_BUTTON_PIN = 35; // Wi-Fi reset button
-int count = 0;//     loop count
 
+const uint32_t kBaudRate = 115200;
 const uint16_t kCaptureBufferSize = 1024;
+
+#if DECODE_AC
 const uint8_t kTimeout = 50;
-const uint8_t kTolerancePercentage = 25; // Default tolerance of 25%
+#else
+const uint8_t kTimeout = 15;
+#endif
+
+const uint16_t kMinUnknownSize = 12;
+const uint8_t kTolerancePercentage = kTolerance;
+
+IRrecv irrecv(kRecvPin, kCaptureBufferSize, kTimeout, true);
+decode_results results;
 
 IRsend irsend(kIrLedPin);
-//IRrecv irrecv(kRecvPin, kCaptureBufferSize, kTimeout, true);
-//decode_results results;
 
 // Create objects for each protocol
 IRCoolixAC coolixAC(kIrLedPin);
@@ -88,7 +103,8 @@ const char* mqtt_pass = "Secret!@#$1234";
 #define AMBIENT_SENSOR_TOPIC                        ("DMA/AC/" DEVICE_ID "/AMBIENT")         //PUBLISH
 #define STATUS_TOPIC                                ("DMA/AC/" DEVICE_ID "/STATUS")          //PUBLISH
 #define REMOTE_TOPIC                                ("DMA/AC/" DEVICE_ID "/REMOTE")          //PUBLISH
-#define CONTROL_TOPIC                               ("DMA/AC/" DEVICE_ID "/CONTROL")         //SUBSCR
+#define CONTROL_TOPIC                               ("DMA/AC/" DEVICE_ID "/CONTROL")         //SUBSCRIBE
+#define REMOTE_DECODE                               ("DMA/AC/" DEVICE_ID "/DECODE")         //SUBSCRIBE
 
 const char* ac_protocol;
 
@@ -110,6 +126,7 @@ void reconnectMQTT();
 void cllback(char* topic, byte* payload, unsigned int length);
 void publishState();
 void controlAC();
+void IRrecvDump_v2();
 
 void handleButtonPress();
 
@@ -248,6 +265,7 @@ void reconnectMQTT() {
     else if (client.connect("ESP32Client", mqtt_user, mqtt_pass)) {
       Serial.println("Connected to MQTT broker");
       client.subscribe(CONTROL_TOPIC);
+      client.subscribe(REMOTE_DECODE);
     } else {
       Serial.print("  Failed, rc=");
       Serial.println(client.state());
@@ -393,6 +411,43 @@ void callback(char* topic, byte* payload, unsigned int length) {
 /////////////////////////////////////////////////////////////////////////////////////
 /**********************************************************************************/
 /////////////////////////////////////////////////////////////////////////////////////
+
+void IRrecvDump_v2() {
+  if (irrecv.decode(&results)) {
+    uint32_t now = millis();
+    Serial.println("2: ");
+    Serial.printf(D_STR_TIMESTAMP " : %06u.%03u\n", now / 1000, now % 1000);
+
+    if (results.overflow) {
+      Serial.println("3: ");
+      Serial.printf(D_WARN_BUFFERFULL "\n", kCaptureBufferSize);
+    }
+
+    Serial.println("4: ");
+    Serial.println(D_STR_LIBRARY " : v" _IRREMOTEESP8266_VERSION_STR "\n");
+
+    if (kTolerancePercentage != kTolerance) {
+      Serial.println("5: ");
+      Serial.printf(D_STR_TOLERANCE " : %d%%\n", kTolerancePercentage);
+    }
+
+    Serial.println("6: ");
+    Serial.print(resultToHumanReadableBasic(&results));
+    client.publish(REMOTE_TOPIC, resultToHumanReadableBasic(&results).c_str() );
+
+    String description = IRAcUtils::resultAcToString(&results);
+    if (description.length()) {
+      Serial.println(D_STR_MESGDESC ": " + description);
+    }
+
+    yield();
+
+    Serial.println("8: ");
+    Serial.println(resultToSourceCode(&results));
+    Serial.println();
+    yield();
+  }
+}
 
 
 void controlAC() {
@@ -562,10 +617,28 @@ void setup() {
   FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
   delay(255);
 
+  /******************************************************/
+  #if defined(ESP8266)
+  Serial.begin(kBaudRate, SERIAL_8N1, SERIAL_TX_ONLY);
+  #else
+  Serial.begin(kBaudRate, SERIAL_8N1);
+  #endif
+  while (!Serial);
+  assert(irutils::lowLevelSanityCheck() == 0);
+
+  Serial.println("1: ");
+  Serial.printf("\n" D_STR_IRRECVDUMP_STARTUP "\n", kRecvPin);
+  #if DECODE_HASH
+  irrecv.setUnknownThreshold(kMinUnknownSize);
+  #endif
+  irrecv.setTolerance(kTolerancePercentage);
+  irrecv.enableIRIn();
+  /******************************************************/
+
   pinMode(LED_PIN, OUTPUT);
+  pinMode(36, INPUT);
   pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
-  //irrecv.setTolerance(kTolerancePercentage);
-  //irrecv.enableIRIn();  // Start the IR receiver
+
 
 //     ------------------------    wifi reset    ---------------------------
   unsigned long startTime = millis();  // Store the starting time
@@ -629,6 +702,10 @@ void loop() {
   }
   client.loop(); // Handle incoming MQTT messages
   delay(10); // Publish data every .1 seconds
+
+  IRrecvDump_v2();
+
+
 }
 
 /**********----  -----   -------   ----- end  main    ------   -------   -------------***** */
