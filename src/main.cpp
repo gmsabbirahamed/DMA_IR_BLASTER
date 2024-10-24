@@ -14,7 +14,6 @@
 
 #include "Config.h"
 
-
 // Define the number of LEDs and the data pin
 #define NUM_LEDS 1
 #define DATA_PIN 4
@@ -28,12 +27,12 @@ CRGB leds[NUM_LEDS];
 
 // IR setup &&&& PIN
 
-const uint16_t kRecvPin = 
-#ifdef ARDUINO_ESP32C3_DEV
+const uint16_t kRecvPin = 14;
+/*#ifdef ARDUINO_ESP32C3_DEV
   10; // 14 on a ESP32-C3 causes a boot loop.
 #else
-  16;
-#endif
+  14;
+#endif*/
 
 const uint16_t kIrLedPin = 27; // GPIO for IR LED
 const int LED_PIN = 2; // LED status indicator
@@ -129,6 +128,8 @@ void controlAC();
 void IRrecvDump_v2();
 
 void handleButtonPress();
+
+
 
 // Function to calculate the CRC for the SHT3x data (polynomial 0x31)
 uint8_t calculateCRC(uint8_t data[], uint8_t length) {
@@ -432,12 +433,15 @@ void IRrecvDump_v2() {
     }
 
     Serial.println("6: ");
-    Serial.print(resultToHumanReadableBasic(&results));
-    client.publish(REMOTE_TOPIC, resultToHumanReadableBasic(&results).c_str() );
+    String remote_msg = resultToHumanReadableBasic(&results);
+    Serial.print(remote_msg);
+    //client.publish(REMOTE_TOPIC, remote_msg.c_str() );
 
     String description = IRAcUtils::resultAcToString(&results);
     if (description.length()) {
       Serial.println(D_STR_MESGDESC ": " + description);
+      String remote = remote_msg + description;
+      client.publish(REMOTE_TOPIC, remote.c_str() );
     }
 
     yield();
@@ -636,7 +640,7 @@ void setup() {
   /******************************************************/
 
   pinMode(LED_PIN, OUTPUT);
-  pinMode(36, INPUT);
+  pinMode(14, INPUT);
   pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
 
 
