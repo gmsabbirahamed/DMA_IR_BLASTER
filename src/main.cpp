@@ -129,7 +129,124 @@ void IRrecvDump_v2();
 
 void handleButtonPress();
 
+/*********************************************************************/
+// Define whether to use FastLED (1) or RGB LED pins (0)
+#define USE_FASTLED 1
 
+#if USE_FASTLED
+// FastLED control
+void GreenBlink() {
+  leds[0] = CRGB::Green; // green blink
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Green;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+}
+
+void BlueBlink() {
+  leds[0] = CRGB::Blue; // blue blink
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Blue;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+}
+
+void YellowBlink() {
+  leds[0] = CRGB::Yellow; // blue blink
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Yellow;
+  FastLED.show();
+  delay(120);
+  leds[0] = CRGB::Black;
+  FastLED.show();
+}
+
+void RedLed() {
+  leds[0] = CRGB::Red;
+  FastLED.show();
+}
+
+void GreenLed() {
+  leds[0] = CRGB::Green;
+  FastLED.show();
+}
+
+void BlueLed() {
+  leds[0] = CRGB::Blue;
+  FastLED.show();
+}
+
+void YellowLed() {
+  leds[0] = CRGB::Yellow;
+  FastLED.show();
+}
+
+void BlackLed() {
+  leds[0] = CRGB::Black;
+  FastLED.show();
+}
+
+#else
+// RGB LED control via pins
+#define RED_LED_PIN    14
+#define GREEN_LED_PIN  26
+#define BLUE_LED_PIN   25
+
+void GreenBlink() {
+  digitalWrite(GREEN_LED_PIN, LOW);    
+  delay(120);
+  digitalWrite(GREEN_LED_PIN, HIGH);
+  delay(120);
+  digitalWrite(GREEN_LED_PIN, LOW);
+  delay(120);
+  digitalWrite(GREEN_LED_PIN, HIGH);
+}
+
+void BlueBlink() {
+  digitalWrite(BLUE_LED_PIN, LOW);
+  delay(120);
+  digitalWrite(BLUE_LED_PIN, HIGH);
+  delay(120);
+  digitalWrite(BLUE_LED_PIN, LOW);
+  delay(120);
+  digitalWrite(BLUE_LED_PIN, HIGH);
+}
+
+void RedLed() {
+  digitalWrite(RED_LED_PIN, LOW);
+}
+
+void GreenLed() {
+  digitalWrite(GREEN_LED_PIN, LOW);
+}
+
+void BlueLed() {
+  digitalWrite(BLUE_LED_PIN, LOW);
+}
+
+void BlackLed() {
+  digitalWrite(RED_LED_PIN, HIGH);
+  digitalWrite(GREEN_LED_PIN, HIGH);
+  digitalWrite(BLUE_LED_PIN, HIGH);
+}
+#endif
+/*********************************************************************/
 
 // Function to calculate the CRC for the SHT3x data (polynomial 0x31)
 uint8_t calculateCRC(uint8_t data[], uint8_t length) {
@@ -224,7 +341,11 @@ void connectToWiFi() {
     Serial.println("Attempting to connect to Wi-Fi...");
     WiFi.begin();
     int counter = 0;
-    while (WiFi.status() != WL_CONNECTED && counter < 30) {  // Wait for max 15 seconds
+    while (WiFi.status() != WL_CONNECTED && counter < 15) {  // Wait for max 15 seconds
+      RedLed();
+      delay(500);
+      Serial.print(".");
+      BlackLed();
       delay(500);
       Serial.print(".");
       counter++;
@@ -267,7 +388,9 @@ void reconnectMQTT() {
       Serial.println("Connected to MQTT broker");
       client.subscribe(CONTROL_TOPIC);
       client.subscribe(REMOTE_DECODE);
+      BlackLed();
     } else {
+      YellowLed();
       Serial.print("  Failed, rc=");
       Serial.println(client.state());
       delay(5000); // Wait 5 seconds before retrying
@@ -278,6 +401,7 @@ void reconnectMQTT() {
 // MQTT message callback handler
 void callback(char* topic, byte* payload, unsigned int length) {
   String message;
+  BlueBlink();
   
   // Convert payload to a string
   for (int i = 0; i < length; i++) {
@@ -442,6 +566,7 @@ void IRrecvDump_v2() {
       Serial.println(D_STR_MESGDESC ": " + description);
       String remote = remote_msg + description;
       client.publish(REMOTE_TOPIC, remote.c_str() );
+      GreenBlink();
     }
 
     yield();
@@ -604,6 +729,7 @@ void publishState() {
 
   String message = powerCmd + " " + String(acState.temperature) + " " + modeCmd + " " + fanCmd;
   client.publish(STATUS_TOPIC, message.c_str());
+  GreenBlink();
 }
 
 /*************************************  ---  End  --  ************************************ */
@@ -697,6 +823,7 @@ void loop() {
     Serial.print(sensor_1);
     if (client.connected()) {
       client.publish(AIRFLOW_SENSOR_TOPIC, sensor_1);
+      GreenBlink();
       Serial.println(sensor_1);
       } else {
       client.publish(AIRFLOW_SENSOR_TOPIC, "error");
