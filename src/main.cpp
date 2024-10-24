@@ -414,17 +414,30 @@ void callback(char* topic, byte* payload, unsigned int length) {
   int lastIndex = 0;
 
   // Loop to split the message by spaces
+  /*
   for (int i = 0; i < message.length() && partIndex < 5; i++) {
-    if (message[i] == ' ') {
+    if (message[i] == ',') {
       parts[partIndex] = message.substring(lastIndex, i);
       partIndex++;
       lastIndex = i + 1;
     }
   }
-  // Store the last part (if any remaining)
-  if (lastIndex < message.length()) {
-    parts[partIndex] = message.substring(lastIndex);
+  */
+  for (int i = 0; i < message.length() && partIndex < 5; i++) {
+  if (message[i] == ',') {
+    parts[partIndex] = message.substring(lastIndex, i);
+    parts[partIndex].trim();  // Trim leading/trailing spaces
+    partIndex++;
+    lastIndex = i + 1;
   }
+}
+
+// Store and trim the last part (after the last comma)
+if (lastIndex < message.length()) {
+  parts[partIndex] = message.substring(lastIndex);
+  parts[partIndex].trim();  // Trim leading/trailing spaces
+}
+
 
   // Ensure all parts are valid before processing
   if (partIndex >= 4) {  // Check if there are at least 5 parts
